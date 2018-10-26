@@ -125,39 +125,38 @@ According to linear regression, slope is 573 ( > 0 ), so the total activity coun
 ### Day of the week affects activity
 
 ```{r}
-iso = total_activity_over_day %>% 
+iqr_dow = total_activity_over_day %>% 
   group_by(day) %>% 
-  ggplot(aes(x = day, y = total, fill = day)) +
-  viridis::scale_fill_viridis(name = "Day of week", discrete = TRUE) +
-  geom_boxplot() +
-  labs(
-    title = "Day of the Week Effects On Activity",
-    subtitle = "in isolation to the effect of time",
-    x = "Day of the Week",
-    y = "Activity of the Day"
-  ) + 
-  theme(plot.subtitle = element_text(hjust = 0.5)) +
-  theme(legend.position = "none")
+  summarise(iqr_day = IQR(total)) %>% 
+  arrange(desc(iqr_day)) 
+
+med_dow = total_activity_over_day %>% 
+  group_by(day) %>% 
+  summarise(median_day = median(total)) %>% 
+  arrange(desc(median_day))
+
+cbind(iqr_dow, med_dow) %>% 
+  knitr::kable(digits = 2, align = 'l')
 ```
 
-Day of week does affect total activity over the day. This patient were more active in Sunday and Friday (higher-median and wider-IQR), the reason maybe there are regular activities like parties or scheduled rehabilitation, and less active in Monday and Tuesday. He was tired and rest in first two weekdays.
+Day of week does affect total activity over the day. This patient were more active in Saturday, Sunday and Friday (higher-median and wider-IQR), the reason maybe there are regular activities like parties or scheduled rehabilitation, and less active in Monday and Tuesday. He was tired and rest in first two weekdays.
 
 
-```{r message=FALSE, fig.width = 10, fig.height = 8}
-inadd = am_data_tidy %>% 
+```{r message=FALSE, fig.width = 10, fig.height = 4}
+am_data_tidy %>% 
   group_by(week, day) %>% 
   summarise(total_counts_per_day = mean(act_counts)) %>% 
   ggplot(aes(x = week, y = day)) +
   geom_tile(aes(fill = total_counts_per_day), colour = "white") +
   scale_fill_gradient(low = "lightyellow", high = "darkblue") +
   labs(
+    title = "Day of the Week Effects On Activity",
     subtitle = "in addition to the effect of time",
     x = "Weeks",
     y = "Day of the Week"
   ) + 
   theme(plot.subtitle = element_text(hjust = 0.5))
 
-iso / inadd + plot_layout(ncol = 1, heights = c(3, 1))
 ```
 
 Day of the week does affect activity in addition to the effect of week time. In week3, 4 and 12, there were no activity. On Sunday and Friday, more dark-color cubes means higher activity level.
