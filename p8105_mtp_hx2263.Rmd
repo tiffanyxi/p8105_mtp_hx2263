@@ -63,7 +63,7 @@ In most days of week3, 4 and 12, the number of activity `counts == 1` of this pa
 
 **Distributions for outliers**
 
-```{r outlier_dist}
+```{r fig.show='hide'}
 am_data_tidy_1 = am_data_tidy %>% 
   filter(act_counts > 1)
 
@@ -90,7 +90,6 @@ Distributions for Outliers is highly-right-skewed histgram, most of outliers clu
 total_activity_over_day = am_data_tidy %>% 
   group_by(week, day, date) %>% 
   summarise(total = as.integer(sum(act_counts)))
-total_activity_over_day
 ```
 
 ### Whether patient became more active over time
@@ -104,7 +103,7 @@ total_activity_over_day %>%
   geom_smooth(method = "lm", size = .6, color = "red") +
   geom_smooth(se = F, size = .5) +
   labs(
-    title = "Total Activity Over the Day",
+    title = "Total Activity Over 329 Days",
     x = "Days",
     y = "Total activity over the day",
     caption = "Data from p8105_mtp_data"
@@ -126,7 +125,7 @@ According to linear regression, slope is 573 ( > 0 ), so the total activity coun
 ### Day of the week affects activity
 
 ```{r}
-total_activity_over_day %>% 
+iso = total_activity_over_day %>% 
   group_by(day) %>% 
   ggplot(aes(x = day, y = total, fill = day)) +
   viridis::scale_fill_viridis(name = "Day of week", discrete = TRUE) +
@@ -137,26 +136,28 @@ total_activity_over_day %>%
     x = "Day of the Week",
     y = "Activity of the Day"
   ) + 
-  theme(plot.subtitle = element_text(hjust = 0.5))
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
 ```
 
 Day of week does affect total activity over the day. This patient were more active in Sunday and Friday (higher-median and wider-IQR), the reason maybe there are regular activities like parties or scheduled rehabilitation, and less active in Monday and Tuesday. He was tired and rest in first two weekdays.
 
 
-```{r message=FALSE, fig.width = 10, fig.height = 4}
-am_data_tidy %>% 
+```{r message=FALSE, fig.width = 10, fig.height = 8}
+inadd = am_data_tidy %>% 
   group_by(week, day) %>% 
   summarise(total_counts_per_day = mean(act_counts)) %>% 
   ggplot(aes(x = week, y = day)) +
   geom_tile(aes(fill = total_counts_per_day), colour = "white") +
   scale_fill_gradient(low = "lightyellow", high = "darkblue") +
   labs(
-    title = "Effect of Week on Activity",
     subtitle = "in addition to the effect of time",
     x = "Weeks",
     y = "Day of the Week"
   ) + 
   theme(plot.subtitle = element_text(hjust = 0.5))
+
+iso / inadd + plot_layout(ncol = 1, heights = c(3, 1))
 ```
 
 Day of the week does affect activity in addition to the effect of week time. In week3, 4 and 12, there were no activity. On Sunday and Friday, more dark-color cubes means higher activity level.
