@@ -6,22 +6,22 @@ output: github_document
 ---
 
 ```{r setup, include=FALSE}
+#install.packages("pastecs")
 library(tidyverse)
 library(patchwork)
 knitr::opts_chunk$set(echo = TRUE)
-theme_set(theme_bw() + theme(legend.position = "bottom"))
+theme_set(theme_bw() + theme(legend.position = "bottom") + theme(plot.title = element_text(hjust = 0.5)))
 ```
 
-#Load, tidy & EDA
 
-### Load dataset
+### Load 
 
 ```{r df_import, message = FALSE, cache = TRUE}
 am_data = 
   read_csv(file = "./data/p8105_mtp_data.csv")
 ```
 
-### Tidy data
+### Tidy
 
 ```{r df_tidy}
 am_data_tidy = 
@@ -36,18 +36,15 @@ am_data_tidy =
   separate(activity, into = c("act", "time"), sep = "_") %>% 
   select(-act) %>% 
   arrange(week, day) %>% 
-  mutate(time = as.integer(time)) %>% 
-  group_by(date) %>% 
-  mutate(hour = rep(1:24, each = 60)) %>% 
-  ungroup(date)
+  mutate(time = as.integer(time))
 ```
 
 
 ### Description
 
-Resulting dataset contains `r nrow(am_data_tidy)` observations and `r ncol(am_data_tidy)` variables which represents the record of `r nrow(am_data_tidy)` minutes in `r nrow(am_data)` days of `r nrow(am_data %>% count(week))` weeks. Variables `week`, `day`, `act_counts` respectively stand for the week number, weekdays in that week, and the activity counts for each minute of a 24-hour day starting at midnight. In tidy dataset, `time` is the minute count in one specific day and `act_counts` is the same as `activity.*` in original dataset. Variables `date` is the number of every distinct day. And `hour` variable stands for every hour in one day.
+Resulting dataset contains `r nrow(am_data_tidy)` observations and `r ncol(am_data_tidy)` variables which represents the record of `r nrow(am_data_tidy)` minutes in `r nrow(am_data)` days of `r nrow(am_data %>% count(week))` weeks. Variables `week`, `day`, `act_counts` respectively represent the week number, weekdays in that week, and the activity counts in each minute of a 24-hour-day starting midnight. `time` is the minute counts in every day. `date` is the number of distinct day.
 
-### Discuss any exploratory analyses
+### Exploratory analyses
 
 **Silent counts**
 
@@ -61,32 +58,12 @@ am_data_tidy %>%
   knitr::kable()
 ```
 
-From the table above, in most days of week 3, 4 and 12, the number of activity `counts == 1` of this patient are 1440, which means in these days, he was completely inactive for 24 hours, which doesn't make any sense, so I assume that he took off the accelerometer device. So the activity data in those days are not informative any more.
+In most days of week3, 4 and 12, the number of activity `counts == 1` of this patient are 1440, which means in these days, he was completely inactive for 24-hours, which doesn't make sense, so I assume he took off the accelerometer device. So data in those days are not informative any more.
 
-**Changes of activity counts on a weekly basis**
 
-```{r message = FALSE}
-am_data_tidy %>% 
-  group_by(week) %>% 
-  summarise(total_week = sum(act_counts)) %>% 
-  ggplot(aes(x = week, y = total_week)) +
-  geom_line() +
-  geom_smooth() +
-  labs(
-    title = "Weekly plot",
-    x = "Week",
-    y = "Total activity counts in that week",
-    caption = "Data from p8105_mtp_data"
-  ) +
-  scale_x_continuous(breaks = c(0, 3, 5, 10, 12, 15, 20, 25, 30, 35, 40, 45, 47)) +
-  theme(plot.title = element_text(hjust = 0.5))
-```
+**Distributions for outliers**
 
-The total activeness of the week of this patient increased in the last 47 weeks, although there were many fluctuations over time, the overall trend is upwards. Maybe he did recover from congestive heart failure. There are a huge drop in 3rd week and 12nd week, which could due to the sudden deteriorating condition of his disease or depression mentally to cause the inactivity. But the data in week 3 is odd it could because the patient was not wearing the device some time in week 3.
-
-**Visually inspect distributions for outliers**
-
-```{r outlier_dist, message = FALSE, echo = FALSE}
+```{r outlier_dist}
 am_data_tidy_1 = am_data_tidy %>% 
   filter(act_counts > 1)
 
@@ -102,15 +79,12 @@ am_data_tidy_1 %>%
     x = "Outlier Values",
     y = "Outliers Counts",
     caption = "Data from p8105_mtp_data"
-  ) +
-  theme(plot.title = element_text(hjust = 0.5))
+  ) 
 ```
 
-From the histgram, it is obvious that most of outliers cluster in low values of less than 2500 and the counts decrease as the value increases.This patient didn't have much exaggerating activity counts.
+Distributions for Outliers is highly-right-skewed histgram, most of outliers cluster in low values of <2500 and the counts decrease as the value increases.
 
-# Traditional analysis
-
-### Aggregate accross minutes to create a total activity variable. 
+### Aggregate accross minutes
 
 ```{r}
 total_activity_over_day = am_data_tidy %>% 
@@ -119,42 +93,37 @@ total_activity_over_day = am_data_tidy %>%
 total_activity_over_day
 ```
 
-### Explore the hypothesis that this participant became more active over time
+### Whether patient became more active over time
 
 ### Visually
 
 ```{r message=FALSE}
 total_activity_over_day %>% 
   ggplot(aes(y = total, x = date)) +
-  geom_line() +
-  geom_smooth()+ 
+  geom_line(alpha = .6) +
+  geom_smooth(method = "lm", size = .6, color = "red") +
+  geom_smooth(se = F, size = .5) +
   labs(
     title = "Total Activity Over the Day",
     x = "Days",
     y = "Total activity over the day",
     caption = "Data from p8105_mtp_data"
-  ) +
-  theme(plot.title = element_text(hjust = 0.5))
+  )
 ```
 
-This participant did become more active over time based on the increasing trend of the smooth line.
+This participant did become more active over time based on the increasing trend of the blue smoothline and red linear-regression line. His activeness increased in 47weeks, although there were many fluctuations over time. Maybe he did recover from CHF.
 
 
-###Formal statistical analyses---linear regression
+### Formal statistical analyses
 
 ```{r}
-total_activity_over_day %>% 
-  ggplot(aes(y = total, x = date)) +
-  geom_point(alpha = .5) +
-  geom_smooth(method = "lm")
-  
 lm(total_activity_over_day$total~total_activity_over_day$date)
 ```
 
-According to the results of linear regression, slope is 573 which is greater than 0, so we conclude that the total activity counts is in positive proportion to date. So, this participant did become more active over time based on formal statistical analyses, which is in line with visual result.
+According to linear regression, slope is 573 ( > 0 ), so the total activity counts is in positive proportion to date. So, he did become more active over time based on statistical analyses, which is in line with visualization.
 
 
-### Examine the possibility that day of the week affects activity (in isolation to the effect of time)
+### Day of the week affects activity
 
 ```{r}
 total_activity_over_day %>% 
@@ -164,55 +133,79 @@ total_activity_over_day %>%
   geom_boxplot() +
   labs(
     title = "Day of the Week Effects On Activity",
+    subtitle = "in isolation to the effect of time",
     x = "Day of the Week",
     y = "Activity of the Day"
-  ) +
-  theme(plot.title = element_text(hjust = 0.5))
+  ) + 
+  theme(plot.subtitle = element_text(hjust = 0.5))
 ```
 
-Day of the week does affect total activity over the day. This patient were more active in Sunday and Friday, and less active in Monday and Tuesday. The reason may be there are some regular activities like parties or scheduled rehabilitation in Sunday and Friday, he was tired in Monday and stay in room to rest in first two weekdays.
+Day of week does affect total activity over the day. This patient were more active in Sunday and Friday (higher-median and wider-IQR), the reason maybe there are regular activities like parties or scheduled rehabilitation, and less active in Monday and Tuesday. He was tired and rest in first two weekdays.
 
 
-### Examine the possibility that day of the week affects activity (in addition to the effect of time)
-
-```{r message=FALSE}
+```{r message=FALSE, fig.width = 10, fig.height = 4}
 am_data_tidy %>% 
-  group_by(day, time) %>%
-  summarise(dow_act_counts = mean(act_counts)) %>% 
-  ggplot(aes(x = time, y = dow_act_counts, color = day)) +
-  geom_smooth(se = FALSE, size = .5) +
+  group_by(week, day) %>% 
+  summarise(total_counts_per_day = mean(act_counts)) %>% 
+  ggplot(aes(x = week, y = day)) +
+  geom_tile(aes(fill = total_counts_per_day), colour = "white") +
+  scale_fill_gradient(low = "lightyellow", high = "darkblue") +
   labs(
-    title = "Day of the Week Effects on Activity with the Effect of Time",
-    x = "Time of a Day (minutes)",
-    y = "Activity Over the Time"
-  ) +
-  theme(plot.title = element_text(hjust = 0.5))
+    title = "Effect of Week on Activity",
+    subtitle = "in addition to the effect of time",
+    x = "Weeks",
+    y = "Day of the Week"
+  ) + 
+  theme(plot.subtitle = element_text(hjust = 0.5))
 ```
 
-Day of the week does affect activity in addition to the effect of time. Curve of thursday, friday, and sunday have significantly larger fluctuations in nights than other days of the week, which are relatively gentle and flat.
+Day of the week does affect activity in addition to the effect of week time. In week3, 4 and 12, there were no activity. On Sunday and Friday, more dark-color cubes means higher activity level.
 
 
-# Inspect activity over the course of the day
+### Distribution of activity counts in full dataset 
 
-### Explore the distribution of activity counts in the full dataset 
+```{r}
+pastecs::stat.desc(am_data_tidy[c("act_counts")], 
+                   basic = TRUE, p = 0.95) %>% 
+  knitr::kable(digits = 2, align = 'l')
+```
+
+Mean is much larger than median, indicating the distribution of activity counts in full dataset is highly right-skewed. The high SD indicates the datapoints are spread-out over a wide range.
+
+
+### Other variables of interest
 
 ```{r}
 am_data_tidy %>% 
-  ggplot(aes(x = act_counts))+
-  geom_histogram(bins = 100) +
+  group_by(day) %>% 
+  summarise(sd = sd(act_counts)) %>% 
+  knitr::kable(digits = 2, align = 'l')
+```
+
+Standard deviation of Sunday and Friday data are largest, the activity fluctuation in these days are largest, the patient had more action.
+
+### Visualization of 24-hour-activity “profiles” for each day
+
+```{r fig.width = 10, fig.height = 5, message = FALSE}
+am_data_tidy %>% 
+  group_by(time) %>% 
+  summarise(mean_act_counts = mean(act_counts)) %>% 
+  ggplot(aes(x = time, y = mean_act_counts)) + 
+  geom_line() +
+  geom_smooth(color = "yellow") +
   labs(
-    title = "Day of the Week Effects on Activity with the Effect of Time",
+    title = "Overall plot",
     x = "Time of a Day (minutes)",
-    y = "Activity Over the Time"
+    y = "Average activity counts",
+    caption = "Data from p8105_mtp_data"
   )
 ```
 
-### Taking into account other variables of interest---`week` variable
+Mean 24-hour activity profiles change along with time of one day, activity level in evening is much lower than that in the daytime, representing his sleeping status, no physical activity. There are more dramatic fluctuations in daytime than in night.
 
-*Week VS Counts*
+### Visualize effect of week on activity
 
-```{r message = FALSE}
-
+```{r message = FALSE, fig.width = 10, fig.height = 5}
 week_effect = am_data_tidy %>% 
   mutate(week = as.character(week)) %>% 
   group_by(week, time) %>% 
@@ -231,73 +224,47 @@ week_effect %>%
             aes(label = week)) +
   theme(legend.position = "none") + 
   labs(
-    title = "Week Effects on Activity in 24-hour Time",
+    title = "Week Effects on Activity in each minute",
     x = "Minute of a Day",
     y = "Activity in 24-hour Time",
     caption = "Data from p8105_mtp_data"
-  ) +
-  theme(plot.title = element_text(hjust = 0.5))
+  )
 ```
 
-In week 3, 4 and 12, there were not much activity. In week 36, highest activity level happens in noon, maybe he was working out or emotionally high.
+In week3, 4 and 12, there were hardly any activity, which could because the sudden deteriorating condition of his disease. But the data in week3 is weird, it could because the patient was not wearing the device in week3. In week36, highest activity level happens in noon, maybe he was working out.
 
+### Day of the week effects on activity
 
-### Make a visualization to show the 24-hour activity “profiles” for each day
-
-```{r fig.width = 6, fig.height = 3}
-am_data_tidy %>% 
-  group_by(time) %>% 
-  summarise(mean_act_counts = mean(act_counts)) %>% 
-  ggplot(aes(x = time, y = mean_act_counts)) + 
-  geom_line() +
-  labs(
-    title = "Overall plot",
-    x = "Time of a Day (minutes)",
-    y = "Average activity counts",
-    caption = "Data from p8105_mtp_data"
-  ) +
-  theme(plot.title = element_text(hjust = 0.5))
-```
-
-Mean activity profiles change along with time of one day, in the evening, the activity level is much lower than that in the daytime, it means when you are sleeping, all body structure go to sleep. And there are more dramatic fluctuation in daytime than in night.
-
-### Visualize effect of week on activity in each minute of the 24-hour day
-
-
-```{r fig.width = 3, fig.height = 10}
-am_data_tidy %>% 
-  group_by(week, hour) %>% 
-  summarise(total_day = mean(act_counts)) %>% 
-  ggplot(aes(x = hour, y = week)) +
-  geom_tile(aes(fill = total_day), colour = "white") +
-  scale_fill_gradient(low = "lightyellow", high = "darkblue") +
-  labs(
-    title = "Effect of Week on Activity in Each Minute of 24-Hour day",
-    x = "Hours of a Day (hrs)",
-    y = "Weeks"
-  ) 
-```
-
-
-### day of the week effects on activity in each minute of day
-
-```{r fig.width = 22, fig.height = 4, message = FALSE}
-am_data_tidy %>% 
+```{r fig.width = 12, fig.height = 6, message = FALSE}
+sepe = am_data_tidy %>% 
   group_by(day, time) %>% 
   summarise(sum_act_counts = mean(act_counts)) %>% 
   ggplot(aes(x = time, y = sum_act_counts, color = day)) +
-  facet_grid(~day, space = "free") +
+  facet_grid( ~ day) +
   geom_line(alpha = .5) +
-  geom_smooth(size = .5) +
-  theme_bw() +
-  theme(legend.position = "bottom")
+  geom_smooth(size = .7) +
+  theme(legend.position = "none") + 
+  labs(
+    title = "Day of the Week Effects on Activity in Each Minute",
+    x = "Minute of a Day",
+    y = "Activity Counts"
+  )
   
+all = am_data_tidy %>% 
+  group_by(day, time) %>% 
+  summarise(sum_act_counts = mean(act_counts)) %>% 
+  ggplot(aes(x = time, y = sum_act_counts, color = day)) +
+  geom_line(alpha = .5) +
+  geom_smooth(size = .7, se = FALSE) + 
+  labs(
+    x = "Minute of a Day",
+    y = "Activity Counts",
+    caption = "Data from p8105_mtp_data"
+  )
+
+sepe / all + plot_layout(ncol = 1, heights = c(1, 3))
 ```
 
+Activity profiles for every day of week are mostly identical, so he had a relatively regular lifestyle.
 
-The 24-hour activity profiles for every day of the week are mostly identical， so the patient had a relatively regular lifestyle.
-
-It is obvious that this patient tend to be more active in Sunday noon and night and Thursday, Friday late-night, it makes sense because of the weekends effect. Thursday is the new Friday! Whereas, in Monday, Tuesday and Wednesday, the activity profile are relatively much flattened which indicates that the daily life in first three weekdays are plain and boring, so the patient were less active than weekends, both physically and mentally.
-
-
-
+But he were more active in Sunday noon and Thursday, Friday late-night, it makes sense because of weekends effect. Thursday is the new Friday! Whereas, in Monday Tuesday, the activity profile are much flattened indicating the dailylife in first two weekdays are plain, so he were less physically active.
